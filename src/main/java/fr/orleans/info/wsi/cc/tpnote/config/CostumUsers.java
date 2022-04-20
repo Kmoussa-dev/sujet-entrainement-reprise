@@ -8,35 +8,28 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-public class CustomUserDetailsService implements UserDetailsService {
+public class CostumUsers implements UserDetailsService {
+    @Autowired
+    FacadeQuizz facadeQuizz;
 
     @Autowired
-    private FacadeQuizz facadeQuizz;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    BCryptPasswordEncoder passwordEncoder;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-
-        Utilisateur utilisateur= null;
         try {
-            utilisateur = facadeQuizz.getUtilisateurByEmail(username);
-            if(utilisateur==null){
-                throw new UsernameNotFoundException("User "+username+" not found");
-            }
-            UserDetails userDetails= User.builder()
-                    .username(utilisateur.getEmailUtilisateur())
-                    .password(passwordEncoder.encode(utilisateur.getMotDePasseUtilisateur()))
-                    .roles(utilisateur.getRoles())
+            Utilisateur u = facadeQuizz.getUtilisateurByEmail(username);
+            UserDetails userDetails = User.builder()
+                    .username(u.getEmailUtilisateur())
+                    .password(passwordEncoder.encode(u.getMotDePasseUtilisateur()))
+                    .roles(u.getRoles())
                     .build();
-
             return userDetails;
-
         } catch (UtilisateurInexistantException e) {
-            throw new RuntimeException(e);
+            throw new UsernameNotFoundException("username  " +username );
         }
+    }
 
-
-    }}
+}
