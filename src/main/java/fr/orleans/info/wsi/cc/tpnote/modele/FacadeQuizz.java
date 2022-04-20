@@ -3,8 +3,24 @@ package fr.orleans.info.wsi.cc.tpnote.modele;
 import fr.orleans.info.wsi.cc.tpnote.modele.exceptions.*;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 @Component
 public class FacadeQuizz {
+
+    private Map<String,Utilisateur> mapUtilisateurs;
+    private Map<String,Question> mapQuestions;
+
+
+    public FacadeQuizz(){
+        mapUtilisateurs=new HashMap<>();
+        mapQuestions=new HashMap<>();
+    }
+
+
 
 
     /**
@@ -18,7 +34,21 @@ public class FacadeQuizz {
      */
 
     public int creerUtilisateur(String email,String password) throws EmailDejaUtiliseException, EmailNonValideException, MotDePasseObligatoireException {
-        return 0;
+        if (mapUtilisateurs.containsKey(email)) {
+            throw new EmailDejaUtiliseException();
+        }
+        if (password.isBlank()){
+            throw new MotDePasseObligatoireException();
+        }
+        if(password.isEmpty()){
+            throw new MotDePasseObligatoireException();
+        }
+        if(!OutilsPourValidationEmail.patternMatches(email)){
+            throw new EmailNonValideException();
+        }
+        mapUtilisateurs.put(email,new Utilisateur(email,password));
+
+        return mapUtilisateurs.get(email).getIdUtilisateur();
     }
 
     /**
@@ -28,7 +58,11 @@ public class FacadeQuizz {
      */
 
     public int getIdUserByEmail(String email) throws EmailInexistantException {
-        return 0;
+       if (!mapUtilisateurs.containsKey(email)){
+           throw new EmailInexistantException();
+       }
+        int idUser=mapUtilisateurs.get(email).getIdUtilisateur();
+       return idUser;
     }
 
     /**
@@ -43,7 +77,11 @@ public class FacadeQuizz {
      */
 
     public String creerQuestion(int idUser, String libelleQuestion, String... libellesReponses) throws AuMoinsDeuxReponsesException, LibelleQuestionNonRenseigneException {
-        return null;
+        if(libellesReponses.length<=2) throw new AuMoinsDeuxReponsesException();
+        if(libelleQuestion.isBlank()) throw new LibelleQuestionNonRenseigneException();
+        Question question=new Question(idUser,libelleQuestion,libellesReponses);
+        mapQuestions.put(question.getIdQuestion(),question);
+        return question.getIdQuestion();
     }
 
 
@@ -55,7 +93,9 @@ public class FacadeQuizz {
      */
 
     public Question getQuestionById(String idQuestion) throws QuestionInexistanteException {
-        return null;
+        Question question=mapQuestions.get(idQuestion);
+        if (!mapQuestions.containsKey(idQuestion)) throw new QuestionInexistanteException();
+        return question;
     }
 
     /**
@@ -73,7 +113,9 @@ public class FacadeQuizz {
 
     public void voterReponse(int idUser,String idQuestion, int numeroProposition) throws ADejaVoteException,
             NumeroPropositionInexistantException, QuestionInexistanteException {
-
+        Question question=mapQuestions.get(idQuestion);
+        if (question==null) throw new QuestionInexistanteException();
+        question.voterPourUneReponse(idUser,numeroProposition);
     }
 
 
@@ -84,6 +126,9 @@ public class FacadeQuizz {
 
     public void reinitFacade(){
     //TODO
+        mapUtilisateurs=new HashMap<>();
+        mapQuestions=new HashMap<>();
+        Utilisateur.resetCompteur();
     }
 
 
@@ -93,7 +138,9 @@ public class FacadeQuizz {
      * @return
      */
     public Utilisateur getUtilisateurByEmail(String username) throws UtilisateurInexistantException {
-        return null;
+        Utilisateur utilisateur=mapUtilisateurs.get(username);
+        if (utilisateur==null) throw new UtilisateurInexistantException();
+        return utilisateur;
     }
 
 
@@ -105,6 +152,8 @@ public class FacadeQuizz {
      */
 
     public ResultatVote[] getResultats(String idQuestion) throws QuestionInexistanteException {
-        return new ResultatVote[0];
+       Question question=mapQuestions.get(idQuestion);
+       if (question==null) throw new QuestionInexistanteException();
+        return question.getResultats();
     }
 }
