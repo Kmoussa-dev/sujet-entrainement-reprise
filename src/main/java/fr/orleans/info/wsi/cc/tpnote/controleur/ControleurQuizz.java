@@ -9,12 +9,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import javax.swing.text.html.parser.Entity;
 import java.net.URI;
 import java.security.Principal;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping(value="/api/quizz", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -28,8 +31,8 @@ public class ControleurQuizz {
     public ResponseEntity<Utilisateur> enregistreUtilisateur(@RequestParam String pseudo,@RequestParam String password){
         try{
             Utilisateur utilisateur=new Utilisateur(pseudo,password);
-            facadeQuizz.creerUtilisateur(utilisateur.getEmailUtilisateur(), utilisateur.getMotDePasseUtilisateur());
-            URI location= ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(utilisateur.getIdUtilisateur()).toUri();
+           int id = facadeQuizz.creerUtilisateur(utilisateur.getEmailUtilisateur(), utilisateur.getMotDePasseUtilisateur());
+            URI location= ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(id).toUri();
             return ResponseEntity.created(location).body(utilisateur);
         } catch (MotDePasseObligatoireException e) {
             return ResponseEntity.status(406).build();
@@ -37,14 +40,16 @@ public class ControleurQuizz {
             return ResponseEntity.status(406).build();
         } catch (EmailDejaUtiliseException e) {
             return ResponseEntity.status(409).build();
+        }catch (Exception e){
+            return ResponseEntity.status(406).build();
         }
     }
     @GetMapping("/utilisateur/{idUtilisateur}")
-    public ResponseEntity<Utilisateur> recupereUtilisateur(Principal principal,@PathVariable("idUtulisateur") int idUtilisateur) throws UtilisateurInexistantException {
+    public ResponseEntity<Utilisateur> recupereUtilisateur(Principal principal,@PathVariable int idUtilisateur) throws UtilisateurInexistantException {
 
             String email=principal.getName();
             Utilisateur utilisateur=facadeQuizz.getUtilisateurByEmail(email);
-            if(utilisateur==null) {
+            if(utilisateur.getIdUtilisateur()!=idUtilisateur) {
                 return ResponseEntity.status(403).build();
             }
         return ResponseEntity.ok().body(utilisateur);
@@ -61,11 +66,11 @@ public class ControleurQuizz {
             URI location= ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(questionRec.getIdQuestion()).toUri();
             return ResponseEntity.created(location).body(questionRec);
         } catch (UtilisateurInexistantException e) {
-            return ResponseEntity.status(406).build();
+            return ResponseEntity.status(403).build();
         } catch (LibelleQuestionNonRenseigneException e) {
-            return ResponseEntity.status(403).build();
+            return ResponseEntity.status(406).build();
         } catch (AuMoinsDeuxReponsesException e) {
-            return ResponseEntity.status(403).build();
+            return ResponseEntity.status(406).build();
         }
     }
 
@@ -81,11 +86,14 @@ public class ControleurQuizz {
     }
 
     @PutMapping("/question/{idQuestion}/vote")
-    public ResponseEntity<Question> enregistreVote(Principal principal,
-                                                   @PathVariable("idQuestion") String idQuestion,
-                                                        @RequestParam Integer idReponse){
+    public ResponseEntity enregistreVote(Authentication authentication,
+                                         @PathVariable String idQuestion,
+                                         @RequestParam int idReponse){
+        List<String> roles =authentication.getAuthorities().stream()
+                .map(r->r.getAuthority()).collect(Collectors.toList());
+        if (!roles.contains("ROLE_ETUDIANT")) return ResponseEntity.status(403).build();
         try{
-            Utilisateur utilisateur=facadeQuizz.getUtilisateurByEmail(principal.getName());
+            Utilisateur utilisateur=facadeQuizz.getUtilisateurByEmail(authentication.getName());
             facadeQuizz.voterReponse(utilisateur.getIdUtilisateur(), idQuestion,idReponse);
             return ResponseEntity.accepted().build();
         } catch (QuestionInexistanteException e) {
@@ -102,14 +110,10 @@ public class ControleurQuizz {
     @GetMapping("/question/{idQuestion}/vote")
     public ResponseEntity<ResultatVote[]> recupereVote(Principal principal, @PathVariable("idQuestion") String idQuestion){
         try{
-            Utilisateur utilisateur=facadeQuizz.getUtilisateurByEmail(principal.getName());
-            Question question=facadeQuizz.getQuestionById(idQuestion);
             ResultatVote[] resultatVotes=facadeQuizz.getResultats(idQuestion);
             return ResponseEntity.ok().body(resultatVotes);
         } catch (QuestionInexistanteException e) {
             return ResponseEntity.notFound().build();
-        } catch (UtilisateurInexistantException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
     }
 }
